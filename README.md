@@ -2,6 +2,8 @@
 
 A Windows desktop app for running 2-round wargame tournaments (Axis vs Allies): player setup, draws, results, standings and Excel export.
 
+Built for **Flames of War** and other World War II wargames.
+
 Made by Thanasis Kaltsoudas.
 
 ## Download
