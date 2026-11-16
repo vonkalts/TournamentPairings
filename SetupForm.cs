@@ -7,7 +7,7 @@ namespace TournamentPairings
 {
     public partial class SetupForm : Form
     {
-        // Όταν κλείνει το SetupForm με OK, εδώ επιστρέφει η κατάσταση (νέα ή ενημερωμένη)
+        // When SetupForm closes with OK, the resulting state (new or updated) is returned here
         public TournamentState? CreatedState { get; private set; }
 
         private readonly TournamentState? _editingState;
@@ -30,12 +30,12 @@ namespace TournamentPairings
             Text = "Create New Tournament";
             Width = 920;
             Height = 600;
-            MinimumSize = new System.Drawing.Size(920, 600);
 
             BuildUi();
+            UiScaler.Attach(this);
         }
 
-        // Edit mode (για επιστροφή πριν το Round 1 Draw)
+        // Edit mode (going back before the Round 1 Draw)
         public SetupForm(TournamentState existingState)
         {
             InitializeComponent();
@@ -45,10 +45,10 @@ namespace TournamentPairings
             Text = "Edit Tournament Setup";
             Width = 920;
             Height = 600;
-            MinimumSize = new System.Drawing.Size(920, 600);
 
             BuildUi();
             LoadFromExistingState();
+            UiScaler.Attach(this);
         }
 
         private void BuildUi()
@@ -168,7 +168,7 @@ namespace TournamentPairings
 
             _btnCreateOrApply.Click += (_, __) =>
             {
-                // Αν είμαστε σε edit mode και έχει γίνει ήδη Round 1 Draw, δεν επιτρέπουμε αλλαγές
+                // In edit mode, no changes are allowed once the Round 1 Draw has been made
                 if (_isEditMode && _editingState != null && _editingState.Round1Drawn)
                 {
                     MessageBox.Show(this,
@@ -182,7 +182,7 @@ namespace TournamentPairings
                 var state = TryBuildState();
                 if (state == null) return;
 
-                // Create mode: απλά επιστρέφουμε νέο state
+                // Create mode: just return the new state
                 if (!_isEditMode)
                 {
                     Storage.AutosaveSnapshot(state);
@@ -192,7 +192,7 @@ namespace TournamentPairings
                     return;
                 }
 
-                // Edit mode: ενημερώνουμε το υπάρχον state (ώστε το Hub να συνεχίσει με το ίδιο object)
+                // Edit mode: update the existing state (so the Hub keeps working with the same object)
                 ApplyToExistingState(state);
                 Storage.AutosaveSnapshot(_editingState!);
 
@@ -203,7 +203,7 @@ namespace TournamentPairings
 
             _btnSaveAs.Click += (_, __) =>
             {
-                // Αν είμαστε σε edit mode και έχει γίνει ήδη Round 1 Draw, δεν επιτρέπουμε αλλαγές
+                // In edit mode, no changes are allowed once the Round 1 Draw has been made
                 if (_isEditMode && _editingState != null && _editingState.Round1Drawn)
                 {
                     MessageBox.Show(this,
@@ -217,7 +217,7 @@ namespace TournamentPairings
                 var state = TryBuildState();
                 if (state == null) return;
 
-                // Αν edit mode, πρώτα κάνουμε apply στο existing
+                // In edit mode, apply to the existing state first
                 if (_isEditMode)
                 {
                     ApplyToExistingState(state);
@@ -260,7 +260,7 @@ namespace TournamentPairings
                 row.Cells["Special"].Value = p.IsSpecial;
             }
 
-            // Αν έχει γίνει Round1Drawn, κλειδώνουμε UI (μόνο ανάγνωση)
+            // If Round 1 has been drawn, lock the UI (read-only)
             if (_editingState.Round1Drawn)
             {
                 _txtName.ReadOnly = true;
@@ -278,18 +278,18 @@ namespace TournamentPairings
         {
             if (_editingState == null) return;
 
-            // Ασφάλεια: αν έχει γίνει Round1Drawn, δεν αλλάζουμε τίποτα
+            // Safety: if Round 1 has been drawn, change nothing
             if (_editingState.Round1Drawn)
                 return;
 
             _editingState.TournamentName = newState.TournamentName;
             _editingState.TableCount = newState.TableCount;
 
-            // Επειδή είμαστε πριν το Round 1 Draw, μπορούμε να αντικαταστήσουμε τους παίκτες πλήρως
-            // (νέα IDs). Αυτό είναι το πιο απλό/ασφαλές χωρίς να σπάσουμε matches.
+            // Before the Round 1 Draw the players can be replaced completely
+            // (new IDs). This is the simplest/safest way without breaking matches.
             _editingState.Players = newState.Players;
 
-            // Reset progress (για να είναι καθαρό αν είχε πατηθεί κάτι κατά λάθος)
+            // Reset progress (clean state in case something was clicked by mistake)
             _editingState.Round1Matches.Clear();
             _editingState.Round2Matches.Clear();
             _editingState.Round1Drawn = false;
@@ -297,7 +297,7 @@ namespace TournamentPairings
             _editingState.Round2Drawn = false;
             _editingState.Round2Completed = false;
 
-            // Reset withdraw flags (προαιρετικά, αλλά καθαρό)
+            // Reset withdraw flags (optional, but cleaner)
             foreach (var p in _editingState.Players)
                 p.IsWithdrawnForRound2 = false;
 

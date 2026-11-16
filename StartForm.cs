@@ -21,12 +21,12 @@ namespace TournamentPairings
             Text = "Tournament Pairings - Start";
             Width = 650;
             Height = 420;
-            MinimumSize = new System.Drawing.Size(650, 420);
 
             _settings = AppSettings.Load();
 
             BuildUi();
             LoadRecent();
+            UiScaler.Attach(this, PositionCredits);
 
             // keep credits at bottom-right
             Resize += (_, __) => PositionCredits();
@@ -49,6 +49,10 @@ namespace TournamentPairings
             _btnOpen = new Button { Text = "Open Tournament File", Left = 20, Top = 105, Width = 220, Height = 35 };
             Controls.Add(_btnNew);
             Controls.Add(_btnOpen);
+
+            var btnHelp = new Button { Text = "Help", Left = 20, Top = 150, Width = 220, Height = 35 };
+            btnHelp.Click += (_, __) => HelpWindow.Show(this);
+            Controls.Add(btnHelp);
 
             _btnNew.Click += (_, __) =>
             {

@@ -65,6 +65,8 @@ namespace TournamentPairings
         private CheckBox _chkR2VolBye = null!;
         private CheckedListBox _clbR2VolBye = null!;
         private Button _btnR2DoDraw = null!;
+        private CheckBox _chkR2AxisAllies = null!;
+        private CheckBox _chkR2AvoidTables = null!;
         private Button _btnR2Back = null!;
         private DataGridView _gridR2 = null!;
 
@@ -95,13 +97,13 @@ namespace TournamentPairings
             Text = "Tournament Hub";
             Width = 1200;
             Height = 760;
-            MinimumSize = new System.Drawing.Size(1200, 760);
 
             BuildUi();
 
             EnableGridRowNumbers();
             PositionRoundStatus();
             Resize += (_, __) => PositionRoundStatus();
+            UiScaler.Attach(this, PositionRoundStatus);
 
             ShowStandings();
             RefreshStandings();
@@ -138,6 +140,10 @@ namespace TournamentPairings
                 Visible = false
             };
             Controls.Add(_lblRoundStatus);
+
+            var btnHelp = new Button { Text = "Help", Left = 1075, Top = 6, Width = 90, Height = 28, Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            btnHelp.Click += (_, __) => HelpWindow.Show(this);
+            Controls.Add(btnHelp);
 
             _panelStandings = MakePanel();
             _panelR1Draw = MakePanel();
@@ -451,11 +457,19 @@ namespace TournamentPairings
             {
                 try
                 {
+                    if (_state.Round1Completed)
+                    {
+                        MessageBox.Show(this, "Round 1 results are locked. The Round 1 draw can no longer be changed.", "Not allowed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
                     var selectedVolByeIds = _chkR1VolBye.Checked
                         ? GetCheckedPlayers(_clbR1VolBye).Select(p => p.Id).ToList()
                         : new List<Guid>();
 
-                    SaveR1LateEntrySelection();
+                    // The list is only filled while the box is checked; an empty list must not clear saved Late Entries
+                    if (_chkR1LateEntry.Checked)
+                        SaveR1LateEntrySelection();
 
                     var matches = GenerateRound1WithSelections(selectedVolByeIds);
 
@@ -667,13 +681,15 @@ namespace TournamentPairings
             };
 
             _btnR2DoDraw = new Button { Text = "Create Round 2 Draw", Left = 585, Top = 145, Width = 190, Height = 32 };
+            _chkR2AxisAllies = new CheckBox { Text = "Prefer Axis vs Allies", Left = 790, Top = 150, Width = 200 };
+            _chkR2AvoidTables = new CheckBox { Text = "Avoid Round 1 tables", Left = 1000, Top = 150, Width = 170, Checked = true };
             _btnR2Back = new Button { Text = "Back", Left = 1015, Top = 26, Width = 140, Height = 32, Anchor = AnchorStyles.Top | AnchorStyles.Right };
 
             _panelR2Draw.Controls.AddRange(new Control[]
             {
                 _chkActivateLateEntryR2, _clbActivateLateEntryR2, _btnActivateLateEntryR2, _lblLateEntryList,
                 _chkWithdrawR2, _clbWithdrawR2, _btnApplyWithdrawR2, _lblWithdrawnList,
-                _chkR2VolBye, _clbR2VolBye, _btnR2DoDraw, _btnR2Back
+                _chkR2VolBye, _clbR2VolBye, _btnR2DoDraw, _chkR2AxisAllies, _chkR2AvoidTables, _btnR2Back
             });
 
             _gridR2 = new DataGridView
@@ -741,6 +757,8 @@ namespace TournamentPairings
             tooltip.SetToolTip(_btnActivateLateEntryR2, "Manage late entry players and activate them for the next round.");
             tooltip.SetToolTip(_btnApplyWithdrawR2, "Mark players as withdrawn and save changes.");
             tooltip.SetToolTip(_btnR2DoDraw, "Generate pairings for the selected round.");
+            tooltip.SetToolTip(_chkR2AxisAllies, "When possible, pair Axis players with Allies players (may change opponents within the same group of 4 in the ranking).");
+            tooltip.SetToolTip(_chkR2AvoidTables, "Nobody plays on the same table as in Round 1 (when possible).");
             tooltip.SetToolTip(_btnR2Back, "Return to the previous or setup screen.");
 
             _btnR2Back.Click += (_, __) => { ShowStandings(); RefreshStandings(); RefreshButtons(); };
@@ -755,11 +773,19 @@ namespace TournamentPairings
                         return;
                     }
 
+                    if (_state.Round2Completed)
+                    {
+                        MessageBox.Show(this, "Round 2 results are locked. The Round 2 draw can no longer be changed.", "Not allowed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
                     var selectedVolByeIds = _chkR2VolBye.Checked
                         ? GetCheckedPlayers(_clbR2VolBye).Select(p => p.Id).ToList()
                         : new List<Guid>();
 
-                    SaveWithdrawSelectionR2();
+                    // The list is only filled while the box is checked; an empty list must not clear saved withdrawals
+                    if (_chkWithdrawR2.Checked)
+                        SaveWithdrawSelectionR2();
 
                     var result = GenerateRound2WithSelections(selectedVolByeIds);
 
@@ -894,7 +920,7 @@ namespace TournamentPairings
                 tempState.Round1Matches = _state.Round1Matches;
                 tempState.Round1Completed = _state.Round1Completed;
 
-                var result = PairingEngine.GenerateRound2(tempState, null);
+                var result = PairingEngine.GenerateRound2(tempState, null, _chkR2AxisAllies.Checked, _chkR2AvoidTables.Checked);
                 matches.AddRange(result.matches);
                 warning = result.warning;
             }
@@ -1312,7 +1338,7 @@ namespace TournamentPairings
                     int outcomeCount = (winA ? 1 : 0) + (winB ? 1 : 0) + (draw ? 1 : 0);
                     if (outcomeCount != 1)
                     {
-                        MessageBox.Show(this, $"{ContextPrefix(match)} Διάλεξε ΑΚΡΙΒΩΣ ένα: Win A / Win B / Draw.", "Validation",
+                        MessageBox.Show(this, $"{ContextPrefix(match)} Select EXACTLY one: Win A / Win B / Draw.", "Validation",
                             MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         return;
                     }
@@ -1428,13 +1454,13 @@ namespace TournamentPairings
 
             if (!int.TryParse(txt, out int v))
             {
-                error = $"{FriendlyField(colName)} πρέπει να είναι αριθμός.";
+                error = $"{FriendlyField(colName)} must be a number.";
                 return false;
             }
 
             if (v < min || v > max)
             {
-                error = $"{FriendlyField(colName)} πρέπει να είναι {min}–{max}.";
+                error = $"{FriendlyField(colName)} must be between {min} and {max}.";
                 return false;
             }
 
@@ -1450,19 +1476,19 @@ namespace TournamentPairings
             var txt = (row.Cells[colName].Value?.ToString() ?? "").Trim();
             if (string.IsNullOrWhiteSpace(txt))
             {
-                error = $"{FriendlyField(colName)} είναι υποχρεωτικό.";
+                error = $"{FriendlyField(colName)} is required.";
                 return false;
             }
 
             if (!int.TryParse(txt, out value))
             {
-                error = $"{FriendlyField(colName)} πρέπει να είναι αριθμός.";
+                error = $"{FriendlyField(colName)} must be a number.";
                 return false;
             }
 
             if (value < min || value > max)
             {
-                error = $"{FriendlyField(colName)} πρέπει να είναι {min}–{max}.";
+                error = $"{FriendlyField(colName)} must be between {min} and {max}.";
                 return false;
             }
 
@@ -1496,8 +1522,15 @@ namespace TournamentPairings
                 };
                 if (sfd.ShowDialog(this) == DialogResult.OK)
                 {
-                    ExcelExporter.ExportTournament(_state, sfd.FileName);
-                    MessageBox.Show(this, "Exported.", "OK", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    try
+                    {
+                        ExcelExporter.ExportTournament(_state, sfd.FileName);
+                        MessageBox.Show(this, "Exported.", "OK", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(this, $"Export failed (is the file open in Excel?):\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
                 }
             };
 
